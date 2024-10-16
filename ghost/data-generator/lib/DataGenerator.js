@@ -101,7 +101,7 @@ class DataGenerator {
                 // Avoid deleting the admin user
                 await transaction(table).del().whereNot('id', '1');
             } else {
-                await transaction(table).truncate();
+                await transaction.raw(`DELETE FROM ${table} CASCADE`);
             }
         }
     }
@@ -189,7 +189,7 @@ class DataGenerator {
 
         if (this.useTransaction) {
             await this.knex.transaction(async (transaction) => {
-                if (!DatabaseInfo.isSQLite(this.knex)) {
+                if (DatabaseInfo.isMySQL(this.knex)) {
                     await transaction.raw('SET autocommit=0;');
                 }
 
@@ -203,7 +203,7 @@ class DataGenerator {
     }
 
     async #run(transaction) {
-        if (!DatabaseInfo.isSQLite(this.knex)) {
+        if (DatabaseInfo.isMySQL(this.knex)) {
             if (process.env.DISABLE_FAST_IMPORT) {
                 await transaction.raw('SET FOREIGN_KEY_CHECKS=0;');
                 await transaction.raw('SET unique_checks=0;');
@@ -279,7 +279,7 @@ class DataGenerator {
         // Re-enable the redo log because it's a persisted global
         // Leaving it disabled can break the database in the event of an unexpected shutdown
         // See https://dev.mysql.com/doc/refman/8.0/en/innodb-redo-log.html#innodb-disable-redo-logging
-        if (!DatabaseInfo.isSQLite(this.knex) && !process.env.DISABLE_FAST_IMPORT) {
+        if (DatabaseInfo.isMySQL(this.knex) && !process.env.DISABLE_FAST_IMPORT) {
             await transaction.raw('ALTER INSTANCE ENABLE INNODB REDO_LOG;');
         }
     }

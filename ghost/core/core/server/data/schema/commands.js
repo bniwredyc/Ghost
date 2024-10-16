@@ -512,6 +512,14 @@ async function getTables(transaction = db.knex) {
     } else if (client === 'mysql2') {
         const response = await transaction.raw('show tables');
         return _.flatten(_.map(response[0], entry => _.values(entry)));
+    } else if (client === 'pg') {
+        const response = await transaction.raw(`
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_type = 'BASE TABLE'
+        `);
+        return _.map(response.rows, 'table_name');
     }
 
     return Promise.reject(tpl(messages.noSupportForDatabase, {client: client}));
@@ -530,6 +538,13 @@ async function getIndexes(table, transaction = db.knex) {
     } else if (client === 'mysql2') {
         const response = await transaction.raw(`SHOW INDEXES from ${table}`);
         return _.flatten(_.map(response[0], 'Key_name'));
+    } else if (client === 'pg') {
+        const response = await transaction.raw(`
+            SELECT indexname
+            FROM pg_indexes
+            WHERE tablename = ?
+        `, [table]);
+        return _.map(response.rows, 'indexname');
     }
 
     return Promise.reject(tpl(messages.noSupportForDatabase, {client: client}));
@@ -548,6 +563,13 @@ async function getColumns(table, transaction = db.knex) {
     } else if (client === 'mysql2') {
         const response = await transaction.raw(`SHOW COLUMNS from ${table}`);
         return _.flatten(_.map(response[0], 'Field'));
+    } else if (client === 'pg') {
+        const response = await transaction.raw(`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = ?
+        `, [table]);
+        return _.map(response.rows, 'column_name');
     }
 
     return Promise.reject(tpl(messages.noSupportForDatabase, {client: client}));

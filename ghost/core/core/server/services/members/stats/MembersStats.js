@@ -71,6 +71,17 @@ class MembersStats {
                         builder.whereRaw('created_at >= ?', [startOfRange]);
                     }
                 }).groupByRaw('DATE(created_at, ?)', [dateModifier]);
+        } else if (this._db.knex.client.config.client === 'pg') {
+            const utcOffset = moment.tz(siteTimezone).format('Z');
+
+            result = await this._db.knex('members')
+                .select(this._db.knex.raw("DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE ?) AS created_at, COUNT(*) AS count", [utcOffset]))
+                .where((builder) => {
+                    if (days !== 'all-time') {
+                        builder.whereRaw('created_at >= ?', [startOfRange]);
+                    }
+                })
+                .groupByRaw("DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE ?)", [utcOffset]);
         } else {
             const mins = Math.abs(tzOffsetMins) % 60;
             const hours = (Math.abs(tzOffsetMins) - mins) / 60;

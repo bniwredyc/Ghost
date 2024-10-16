@@ -39,14 +39,28 @@ class MrrStatsService {
     async fetchAllDeltas() {
         const knex = this.knex;
         const ninetyDaysAgo = moment.utc().subtract(90, 'days').startOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
+
+        const dbClient = knex.client.config.client;
+
+        let dateQuery;
+        if (dbClient === 'sqlite3') {
+            dateQuery = knex.raw('CAST(DATE(created_at) as TEXT) as date');
+        } else if (dbClient === 'mysql') {
+            dateQuery = knex.raw('DATE(created_at) as date');
+        } else if (dbClient === 'pg') {
+            dateQuery = knex.raw('CAST(created_at::date as TEXT) as date');
+        } else {
+            throw new Error(`Unsupported database client: ${dbClient}`);
+        }
+
         const rows = await knex('members_paid_subscription_events')
             .select('currency')
-            // In SQLite, DATE(created_at) would map to a string value, while DATE(created_at) would map to a JSDate object in MySQL
-            // That is why we need the cast here (to have some consistency)
-            .select(knex.raw('CAST(DATE(created_at) as CHAR) as date'))
+            .select(dateQuery)
             .select(knex.raw(`SUM(mrr_delta) as delta`))
             .where('created_at', '>=', ninetyDaysAgo)
-            .groupByRaw('CAST(DATE(created_at) as CHAR), currency');
+            .groupBy('date', 'currency')
+            .orderBy(['date', 'currency']);
+
         return rows;
     }
 

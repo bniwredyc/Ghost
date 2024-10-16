@@ -915,7 +915,7 @@ module.exports = class MemberRepository {
 
         const member = await this._Member.findOne({
             id: data.id
-        }, {...options, forUpdate: true});
+        }, {...options});
 
         const customer = await member.related('stripeCustomers').query({
             where: {
@@ -939,16 +939,15 @@ module.exports = class MemberRepository {
         }
         const paymentMethod = paymentMethodId ? await this._stripeAPIService.getCardPaymentMethod(paymentMethodId) : null;
 
-        const model = await this.getSubscriptionByStripeID(subscription.id, {...options, forUpdate: true});
+        const model = await this.getSubscriptionByStripeID(subscription.id, {...options});
 
         const subscriptionPriceData = _.get(subscription, 'items.data[0].price');
         let ghostProduct;
         try {
-            ghostProduct = await this._productRepository.get({stripe_product_id: subscriptionPriceData.product}, {...options, forUpdate: true});
+            ghostProduct = await this._productRepository.get({stripe_product_id: subscriptionPriceData.product}, {...options});
             // Use first Ghost product as default product in case of missing link
             if (!ghostProduct) {
                 ghostProduct = await this._productRepository.getDefaultProduct({
-                    forUpdate: true,
                     ...options
                 });
             }

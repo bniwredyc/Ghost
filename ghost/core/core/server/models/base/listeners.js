@@ -38,7 +38,6 @@ events.on('settings.timezone.edited', function (settingModel, options) {
      */
     return models.Base.transaction(async function (transacting) {
         options.transacting = transacting;
-        options.forUpdate = true;
 
         try {
             const results = await models.Post.findAll(_.merge({filter: 'status:scheduled'}, options));

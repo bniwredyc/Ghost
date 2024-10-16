@@ -74,7 +74,7 @@ class EmailEventStorage {
         // Create a forUpdate transaction
         const existing = await this.#models.EmailRecipientFailure.findOne({
             email_recipient_id: event.emailRecipientId
-        }, {...options, require: false, forUpdate: true});
+        }, {...options, require: false});
 
         if (!existing) {
             // Create a new failure

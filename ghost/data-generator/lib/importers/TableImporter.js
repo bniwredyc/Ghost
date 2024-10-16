@@ -96,10 +96,11 @@ class TableImporter {
     }
 
     async batchInsert(data) {
-        // Write to CSV file
         const rootFolder = os.tmpdir();
         const filePath = path.join(rootFolder, `${this.name}.csv`);
         let now = Date.now();
+        // Determine database type
+        const dbClient = this.knex.client.config.client;
 
         if (data.length > 5000 && !process.env.DISABLE_FAST_IMPORT) {
             try {
@@ -122,7 +123,7 @@ class TableImporter {
             for (let i = 0; i < data.length; i += batchSize) {
                 const slicedData = data.slice(i, i + batchSize);
 
-                // Map data to what MySQL expects in the CSV for values like booleans, null and dates
+                // Map data to what the database expects in the CSV for values like booleans, null and dates
                 for (let j = 0; j < slicedData.length; j++) {
                     const obj = slicedData[j];
 
@@ -132,7 +133,11 @@ class TableImporter {
                         } else if (value instanceof Date) {
                             obj[key] = dateToDatabaseString(value);
                         } else if (value === null) {
-                            obj[key] = '\\N';
+                            if (dbClient === 'pg') {
+                                obj[key] = '';
+                            } else {
+                                obj[key] = '\\N';
+                            }
                         }
                     }
                 }
@@ -142,15 +147,35 @@ class TableImporter {
             debug(`${this.name} saved CSV import file in ${Date.now() - now}ms`);
             now = Date.now();
 
-            // Import from CSV file
-            const [result] = await this.transaction.raw(`LOAD DATA LOCAL INFILE '${filePath}' INTO TABLE \`${this.name}\` FIELDS TERMINATED BY ',' ENCLOSED BY '"' IGNORE 1 LINES (${Object.keys(data[0]).map(d => '`' + d + '`').join(',')});`);
-            if (result.affectedRows !== data.length) {
-                if (Math.abs(result.affectedRows - data.length) > 0.01 * data.length) {
-                    throw new errors.InternalServerError({
-                        message: `CSV import failed: expected ${data.length} imported rows, got ${result.affectedRows}`
-                    });
+
+            if (dbClient === 'mysql' || dbClient === 'mysql2') {
+                // MySQL import
+                const [result] = await this.transaction.raw(`LOAD DATA LOCAL INFILE '${filePath}' INTO TABLE \`${this.name}\` FIELDS TERMINATED BY ',' ENCLOSED BY '"' IGNORE 1 LINES (${Object.keys(data[0]).map(d => '`' + d + '`').join(',')});`);
+                if (result.affectedRows !== data.length) {
+                    if (Math.abs(result.affectedRows - data.length) > 0.01 * data.length) {
+                        throw new errors.InternalServerError({
+                            message: `CSV import failed: expected ${data.length} imported rows, got ${result.affectedRows}`
+                        });
+                    }
+                    logging.warn(`CSV import warning: expected ${data.length} imported rows, got ${result.affectedRows}.`);
                 }
-                logging.warn(`CSV import warning: expected ${data.length} imported rows, got ${result.affectedRows}.`);
+            } else if (dbClient === 'pg') {
+                // PostgreSQL import
+                const columns = Object.keys(data[0]).join(', ');
+                const result = await this.transaction.raw(`
+                    COPY ${this.name} (${columns}) FROM '${filePath}' WITH (FORMAT csv, HEADER true, DELIMITER ',', NULL '')
+                `);
+                if (result.rowCount !== data.length) {
+                    if (Math.abs(result.rowCount - data.length) > 0.01 * data.length) {
+                        throw new errors.InternalServerError({
+                            message: `CSV import failed: expected ${data.length} imported rows, got ${result.rowCount}`
+                        });
+                    }
+                    logging.warn(`CSV import warning: expected ${data.length} imported rows, got ${result.rowCount}.`);
+                }
+            } else {
+                // Fallback for other databases
+                await this.knex.batchInsert(this.name, data).transacting(this.transaction);
             }
         } else {
             await this.knex.batchInsert(this.name, data).transacting(this.transaction);

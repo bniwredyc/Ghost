@@ -573,7 +573,7 @@ class BatchSendingService {
     async updateStatusLock(Model, id, status, allowedStatuses) {
         let model;
         await Model.transaction(async (transacting) => {
-            model = await Model.findOne({id}, {require: true, transacting, forUpdate: true});
+            model = await Model.findOne({id}, {require: true, transacting});
             if (!allowedStatuses.includes(model.get('status'))) {
                 model = undefined;
                 return;

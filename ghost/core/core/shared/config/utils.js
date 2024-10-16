@@ -53,19 +53,22 @@ const checkUrlProtocol = function checkUrlProtocol(url) {
  * https://github.com/indexzero/nconf/issues/235#issuecomment-257606507
  */
 const sanitizeDatabaseProperties = function sanitizeDatabaseProperties(nconf) {
-    if (nconf.get('database:client') === 'mysql') {
+    const database = nconf.get('database');
+
+    // Update client name if it's postgres
+    if (database.client === 'postgres') {
+        nconf.set('database:client', 'pg');
+    } else if (database.client === 'mysql') {
         nconf.set('database:client', 'mysql2');
     }
 
-    const database = nconf.get('database');
-
-    if (nconf.get('database:client') === 'mysql2') {
-        delete database.connection.filename;
-    } else {
+    if (nconf.get('database:client') === 'sqlite3') {
         delete database.connection.host;
         delete database.connection.user;
         delete database.connection.password;
         delete database.connection.database;
+    } else if (nconf.get('database:client') === 'mysql2' || nconf.get('database:client') === 'pg') {
+        delete database.connection.filename;
     }
 
     nconf.set('database', database);

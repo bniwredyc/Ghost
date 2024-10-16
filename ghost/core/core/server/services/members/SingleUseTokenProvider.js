@@ -52,7 +52,7 @@ class SingleUseTokenProvider {
             });
         }
 
-        const model = await this.model.findOne({token}, {transacting: options.transacting, forUpdate: true});
+        const model = await this.model.findOne({token}, {transacting: options.transacting});
 
         if (!model) {
             throw new ValidationError({

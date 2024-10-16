@@ -1346,8 +1346,6 @@ Post = ghostBookshelf.Model.extend({
         let options = this.filterOptions(unfilteredOptions, 'edit', {extraAllowedProperties: ['id']});
 
         const editPost = () => {
-            options.forUpdate = true;
-
             return ghostBookshelf.Model.edit.call(this, data, options)
                 .then((post) => {
                     return this.findOne({
@@ -1390,7 +1388,7 @@ Post = ghostBookshelf.Model.extend({
                 // reset all page HTML so collection cards can be re-rendered with updated posts
                 // NOTE: we can't check for only published edits here as we don't have access to previous values
                 //       to see if a previously published post has been unpublished, so we just reset all pages
-                const pageResetQuery = ghostBookshelf.knex.raw('UPDATE posts set html = NULL WHERE type = "page" AND lexical IS NOT NULL');
+                const pageResetQuery = ghostBookshelf.knex.raw('UPDATE posts set html = NULL WHERE type = \'page\' AND lexical IS NOT NULL');
                 await (options.transacting ? pageResetQuery.transacting(options.transacting) : pageResetQuery);
             }
 
@@ -1461,7 +1459,7 @@ Post = ghostBookshelf.Model.extend({
                 // if we've deleted any published posts, we need to reset the html for all pages so dynamic collection
                 // card content can be re-rendered
                 if (deletedPublishedCount > 0) {
-                    const pageResetQuery = ghostBookshelf.knex.raw('UPDATE posts set html = NULL WHERE type = "page" AND lexical IS NOT NULL');
+                    const pageResetQuery = ghostBookshelf.knex.raw('UPDATE posts set html = NULL WHERE type = \'page\' AND lexical IS NOT NULL');
                     await (options.transacting ? pageResetQuery.transacting(options.transacting) : pageResetQuery);
                 }
 

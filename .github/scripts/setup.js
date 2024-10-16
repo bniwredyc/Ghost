@@ -72,13 +72,11 @@ async function runAndStream(command, args, options) {
             }
 
             currentConfig.database = {
-                client: 'mysql',
-                docker: true,
+                client: 'pg',
                 connection: {
                     host: '127.0.0.1',
-                    user: 'root',
-                    password: 'root',
-                    database: 'ghost'
+                    user: 'postgres',
+                    database: 'ghostdb'
                 }
             };
 

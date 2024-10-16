@@ -1,22 +1,25 @@
 name: ghost
 
 services:
-#  postgres:
-#    image: postgres:15
-#    container_name: ghost-postgres
-#    ports:
-#      - "5432:5432"
-#    environment:
-#      POSTGRES_PASSWORD: root
-#      POSTGRES_DB: ghost
-#    restart: always
-#    volumes:
-#      - ./postgres-preload:/docker-entrypoint-initdb.d
-#      - postgres-data:/var/lib/postgresql/data
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U postgres"]
-#      interval: 1s
-#      retries: 120
+  mysql:
+    image: mysql:8.0.35
+    container_name: ghost-mysql
+    # We'll need to look into how we can further fine tune the memory usage/performance here
+    command: --innodb-buffer-pool-size=1G --innodb-log-buffer-size=500M --innodb-change-buffer-max-size=50 --innodb-flush-log-at-trx_commit=0 --innodb-flush-method=O_DIRECT
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ghost
+    restart: always
+    volumes:
+      # Turns out you can drop .sql or .sql.gz files in here, cool!
+      - ./mysql-preload:/docker-entrypoint-initdb.d
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: "mysql -uroot -proot ghost -e 'select 1'"
+      interval: 1s
+      retries: 120
   redis:
     image: redis:7.0
     container_name: ghost-redis
@@ -45,5 +48,5 @@ services:
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/dashboard.yml:/etc/grafana/provisioning/dashboards/main.yaml
       - ./grafana/dashboards:/var/lib/grafana/dashboards
-#volumes:
-#  postgres-data:
+volumes:
+  mysql-data:

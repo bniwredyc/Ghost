@@ -134,7 +134,7 @@ class LastSeenAtUpdater {
                 const membersApi = this._getMembersApi();
                 await this._db.knex.transaction(async (trx) => {
                     // To avoid a race condition, we lock the member row for update, then the last_seen_at field again to prevent simultaneous updates
-                    const currentMember = await membersApi.members.get({id: memberId}, {require: true, transacting: trx, forUpdate: true});
+                    const currentMember = await membersApi.members.get({id: memberId}, {require: true, transacting: trx});
                     const currentMemberLastSeenAt = currentMember.get('last_seen_at');
                     if (currentMemberLastSeenAt === null || moment(moment.utc(timestamp).tz(timezone).startOf('day')).isAfter(currentMemberLastSeenAt)) {
                         const memberToUpdate = await currentMember.refresh({transacting: trx, forUpdate: false, withRelated: ['labels', 'newsletters']});

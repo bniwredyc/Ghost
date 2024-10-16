@@ -73,6 +73,8 @@ class SubscriptionStatsService {
      **/
     async fetchAllSubscriptionDeltas() {
         const knex = this.knex;
+        const isPostgres = knex.client.config.client === 'pg';
+
         const rows = await knex('members_paid_subscription_events')
             .join('stripe_prices AS price', function () {
                 this.on('price.stripe_price_id', '=', 'members_paid_subscription_events.from_plan')
@@ -82,43 +84,60 @@ class SubscriptionStatsService {
             .join('products AS tier', 'tier.id', '=', 'product.product_id')
             .leftJoin('stripe_prices AS from_price', 'from_price.stripe_price_id', '=', 'members_paid_subscription_events.from_plan')
             .leftJoin('stripe_prices AS to_price', 'to_price.stripe_price_id', '=', 'members_paid_subscription_events.to_plan')
-            .select(knex.raw(`
-                DATE(members_paid_subscription_events.created_at) as date
-            `))
-            .select(knex.raw(`
-                tier.id as tier
-            `))
-            .select(knex.raw(`
-                price.interval as cadence
-            `))
-            .select(knex.raw(`SUM(
-                CASE
+            .select(knex.raw(isPostgres
+                ? `DATE(members_paid_subscription_events.created_at) as date`
+                : `DATE(members_paid_subscription_events.created_at) as date`
+            ))
+            .select(knex.raw(`tier.id as tier`))
+            .select(knex.raw(`price.interval as cadence`))
+            .select(knex.raw(isPostgres
+                ? `SUM(CASE
                     WHEN members_paid_subscription_events.type IN ('created','reactivated','active') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
                     WHEN members_paid_subscription_events.type='updated' AND price.id = to_price.id THEN 1
                     WHEN members_paid_subscription_events.type='updated' AND members_paid_subscription_events.from_plan = members_paid_subscription_events.to_plan AND members_paid_subscription_events.mrr_delta > 0 THEN 1
                     ELSE 0
-                END
-            ) as positive_delta`))
-            .select(knex.raw(`SUM(
-                CASE
+                END) as positive_delta`
+                : `SUM(CASE
+                    WHEN members_paid_subscription_events.type IN ('created','reactivated','active') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
+                    WHEN members_paid_subscription_events.type='updated' AND price.id = to_price.id THEN 1
+                    WHEN members_paid_subscription_events.type='updated' AND members_paid_subscription_events.from_plan = members_paid_subscription_events.to_plan AND members_paid_subscription_events.mrr_delta > 0 THEN 1
+                    ELSE 0
+                END) as positive_delta`
+            ))
+            .select(knex.raw(isPostgres
+                ? `SUM(CASE
                     WHEN members_paid_subscription_events.type IN ('canceled', 'expired','inactive') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
                     WHEN members_paid_subscription_events.type='updated' AND price.id = from_price.id THEN 1
                     ELSE 0
-                END
-            ) as negative_delta`))
-            .select(knex.raw(`SUM(
-                CASE
+                END) as negative_delta`
+                : `SUM(CASE
+                    WHEN members_paid_subscription_events.type IN ('canceled', 'expired','inactive') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
+                    WHEN members_paid_subscription_events.type='updated' AND price.id = from_price.id THEN 1
+                    ELSE 0
+                END) as negative_delta`
+            ))
+            .select(knex.raw(isPostgres
+                ? `SUM(CASE
                     WHEN members_paid_subscription_events.type IN ('created','reactivated','active') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
                     WHEN members_paid_subscription_events.type='updated' AND members_paid_subscription_events.from_plan = members_paid_subscription_events.to_plan AND members_paid_subscription_events.mrr_delta > 0 THEN 1
                     ELSE 0
-                END
-            ) as signups`))
-            .select(knex.raw(`SUM(
-                CASE
+                END) as signups`
+                : `SUM(CASE
+                    WHEN members_paid_subscription_events.type IN ('created','reactivated','active') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
+                    WHEN members_paid_subscription_events.type='updated' AND members_paid_subscription_events.from_plan = members_paid_subscription_events.to_plan AND members_paid_subscription_events.mrr_delta > 0 THEN 1
+                    ELSE 0
+                END) as signups`
+            ))
+            .select(knex.raw(isPostgres
+                ? `SUM(CASE
                     WHEN members_paid_subscription_events.type IN ('canceled', 'expired','inactive') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
                     ELSE 0
-                END
-            ) as cancellations`))
+                END) as cancellations`
+                : `SUM(CASE
+                    WHEN members_paid_subscription_events.type IN ('canceled', 'expired','inactive') AND members_paid_subscription_events.mrr_delta != 0 THEN 1
+                    ELSE 0
+                END) as cancellations`
+            ))
             .groupBy('date', 'tier', 'cadence')
             .orderBy('date');
 
